@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROG 奥创中心 · macOS 原型设计稿</title>
+<style>
+:root {
+  --bg: #08080a;
+  --panel: #101014;
+  --panel-2: #16161c;
+  --line: #26262e;
+  --rog-red: #ff2d2d;
+  --text: #e8e8ec;
+  --text-dim: #8a8a96;
+  --text-faint: #55555f;
+  --green: #3ddc84;
+  --blue: #4da3ff;
+  --orange: #ffab40;
+  --cyan: #40e0e0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "PingFang SC", sans-serif;
+  padding-bottom: 60px;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,45,45,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,45,45,0.03) 1px, transparent 1px);
+  background-size: 42px 42px;
+  pointer-events: none;
+}
+.section-label {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 700; letter-spacing: 2px;
+  color: var(--rog-red);
+  padding: 34px 0 14px;
+}
+.section-label::before { content: "▸"; }
+.section-label small { color: var(--text-faint); font-weight: 400; letter-spacing: 0; margin-left: 8px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+.hero { padding: 34px 0 6px; }
+.hero h1 { font-size: 24px; letter-spacing: 1px; }
+.hero h1 span { color: var(--rog-red); }
+.hero p { color: var(--text-faint); font-size: 13px; margin-top: 6px; }
+
+/* ============ ① 菜单栏模拟 ============ */
+.menubar-mock {
+  margin-top: 16px;
+  height: 34px;
+  background: rgba(20,20,26,0.92);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex; align-items: center;
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: #d5d5dc;
+  user-select: none;
+  overflow: hidden;
+  position: relative;
+}
+.mb-left, .mb-right { display: flex; align-items: center; gap: 16px; }
+.mb-left { flex: 1; }
+.mb-icon { opacity: .9; }
+.mb-app { font-weight: 600; }
+.menubar-mock .spacer { flex: 1; }
+/* —— 核心：状态栏监控小部件 —— */
+.sys-widget {
+  display: flex; align-items: stretch;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: -apple-system, "SF Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.5);
+}
+.sys-widget .seg {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 10px;
+  background: linear-gradient(180deg, #3a4a66, #2a3648);
+  color: #fff;
+  position: relative;
+}
+.sys-widget .seg:nth-child(2) { background: linear-gradient(180deg, #34445e, #253040); }
+.sys-widget .seg:nth-child(3) { background: linear-gradient(180deg, #2c3a52, #1f2937); }
+.sys-widget .seg + .seg::before {
+  content: "";
+  position: absolute; left: -4px; top: 0;
+  width: 8px; height: 100%;
+  background: inherit;
+  transform: skewX(-12deg);
+  z-index: 1;
+}
+.sys-widget .seg span.k { opacity: .75; font-family: -apple-system; }
+.sys-widget .seg span.v { color: #fff; min-width: 30px; text-align: right; }
+.sys-widget .net {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 0 10px;
+  background: linear-gradient(180deg, #232833, #191d26);
+  gap: 1px;
+}
+.sys-widget .net .row { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: #cfcfd8; line-height: 1.15; }
+.sys-widget .net .dot { width: 5px; height: 5px; border-radius: 50%; }
+.sys-widget .net .dot.up { background: var(--rog-red); box-shadow: 0 0 4px var(--rog-red); }
+.sys-widget .net .dot.dn { background: var(--blue); box-shadow: 0 0 4px var(--blue); }
+.hint { font-size: 12px; color: var(--text-faint); margin-top: 10px; }
+.hint b { color: var(--text-dim); }
+
+/* 小部件配色方案对比 */
+.scheme-row { display: flex; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+.scheme {
+  flex: 1; min-width: 300px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: .15s;
+}
+.scheme:hover { border-color: #3a3a44; }
+.scheme.active { border-color: var(--rog-red); box-shadow: 0 0 14px rgba(255,45,45,.15); }
+.scheme-title { font-size: 12px; font-weight: 700; margin-bottom: 12px; display:flex; align-items:center; gap:8px; }
+.scheme-title .tag { font-size: 10px; color: var(--text-faint); font-weight: 400; }
+.scheme-bar { display: flex; align-items: center; justify-content: center; height: 30px; background: rgba(255,255,255,.03); border-radius: 6px; }
+/* 方案B: ROG红黑 */
+.sys-widget.rog .seg { background: linear-gradient(180deg, #26262e, #17171d); color: #fff; }
+.sys-widget.rog .seg:nth-child(2) { background: linear-gradient(180deg, #22222a, #141419); }
+.sys-widget.rog .seg:nth-child(3) { background: linear-gradient(180deg, #1d1d24, #101015); }
+.sys-widget.rog .seg span.v { color: var(--rog-red); text-shadow: 0 0 8px rgba(255,45,45,.5); }
+.sys-widget.rog .net { background: linear-gradient(180deg, #1a1a20, #0e0e12); }
+/* 方案C: 半透明自适应 */
+.sys-widget.trans .seg { background: rgba(120,130,150,.28); }
+.sys-widget.trans .seg:nth-child(2) { background: rgba(110,120,140,.22); }
+.sys-widget.trans .seg:nth-child(3) { background: rgba(100,110,130,.16); }
+.sys-widget.trans .net { background: rgba(80,90,110,.22); }
+.sys-widget.trans { backdrop-filter: blur(8px); }
+
+/* ============ ② 应用窗口原型 ============ */
+.window-frame {
+  border-radius: 12px;
+  border: 1px solid #2a2a32;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.4);
+  display: flex;
+  background: var(--bg);
+  height: 560px;
+}
+.win-side {
+  width: 200px; min-width: 200px;
+  background: linear-gradient(180deg, #0d0d11, #0a0a0d);
+  border-right: 1px solid var(--line);
+  padding: 14px 10px;
+  display: flex; flex-direction: column;
+}
+.win-logo { display:flex; align-items:center; gap:9px; padding: 6px 8px 16px; }
+.win-logo .mark {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg,#1c1c22,#101014);
+  border: 1px solid #33333d;
+  clip-path: polygon(0 0,100% 0,100% 72%,72% 100%,0 100%);
+  display:flex; align-items:center; justify-content:center;
+  color: var(--rog-red); font-weight: 900; font-size: 15px;
+}
+.win-logo .t1 { font-size: 13px; font-weight: 700; }
+.win-logo .t2 { font-size: 8.5px; color: var(--rog-red); letter-spacing: 2px; }
+.side-item {
+  display:flex; align-items:center; gap:9px;
+  padding: 8px 11px; border-radius: 7px;
+  font-size: 12.5px; color: var(--text-dim);
+  margin-bottom: 3px;
+}
+.side-item.active {
+  color: #fff;
+  background: linear-gradient(90deg, rgba(255,45,45,.16), rgba(255,45,45,.04));
+  box-shadow: inset 3px 0 0 var(--rog-red);
+}
+.side-foot { margin-top:auto; font-size: 10.5px; color: var(--text-faint); display:flex; align-items:center; gap:7px; padding: 0 8px; }
+.side-foot .g { width:6px; height:6px; border-radius:50%; background: var(--green); box-shadow:0 0 6px var(--green); }
+.win-main { flex:1; padding: 20px 22px; overflow: hidden; }
+.win-title-row { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:16px; }
+.win-h { font-size: 19px; font-weight: 800; display:flex; gap:10px; align-items:center; }
+.win-h::before { content:""; width:4px; height:19px; background: linear-gradient(180deg,var(--rog-red),#7a0f0f); clip-path: polygon(0 0,100% 0,100% 85%,55% 100%,0 100%); }
+.win-h-sub { font-size: 11px; color: var(--text-faint); margin-top:5px; margin-left:14px; }
+.mini-stats { display:grid; grid-template-columns: repeat(3,1fr); gap:12px; margin-bottom:14px; }
+.mini-card {
+  background: linear-gradient(160deg,var(--panel-2),var(--panel));
+  border:1px solid var(--line); border-radius:10px; padding:14px 16px;
+}
+.mini-k { font-size:11px; color:var(--text-dim); }
+.mini-v { font-size:24px; font-weight:800; font-family:"SF Mono",monospace; margin-top:6px; }
+.mini-s { font-size:10px; color:var(--text-faint); margin-top:3px; }
+.win-cards { display:grid; grid-template-columns: 1.4fr 1fr; gap:12px; }
+.win-card {
+  background: var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px;
+  position:relative; overflow:hidden;
+}
+.win-card::before { content:""; position:absolute; top:0; left:0; width:100%; height:2px;
+  background: linear-gradient(90deg,var(--rog-red),rgba(255,45,45,.12) 40%,transparent 65%); }
+.win-card h4 { font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.win-card h4::before { content:""; width:3px; height:12px; background:var(--rog-red); clip-path:polygon(0 0,100% 0,100% 80%,50% 100%,0 100%); }
+.mode-row { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.mode-box {
+  border:1px solid var(--line); border-radius:8px; padding:12px 8px; text-align:center;
+  font-size:12px; background:var(--panel-2); color:var(--text-dim);
+  clip-path: polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,9px 100%,0 calc(100% - 9px));
+}
+.mode-box.active { border-color:var(--rog-red); color:var(--rog-red);
+  background:linear-gradient(160deg,rgba(255,45,45,.14),rgba(255,45,45,.03)); }
+.mode-box small { display:block; font-size:9.5px; color:var(--text-faint); margin-top:4px; }
+.gauge-row { display:flex; justify-content:space-around; }
+.gauge-mini { text-align:center; }
+.gauge-mini .ring {
+  width:64px; height:64px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; font-weight:800; font-family:"SF Mono",monospace;
+  margin-bottom:7px;
+}
+.gauge-mini .lbl { font-size:10px; color:var(--text-faint); }
+
+/* ============ ③ 功能清单 & 技术方案 ============ */
+.plan-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px; }
+.plan-card {
+  background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px 22px;
+}
+.plan-card h3 { font-size:14px; margin-bottom:14px; display:flex; align-items:center; gap:9px; }
+.plan-card h3::before { content:""; width:4px; height:14px; background:var(--rog-red); clip-path:polygon(0 0,100% 0,100% 80%,50% 100%,0 100%); }
+.plan-card ul { list-style:none; }
+.plan-card li {
+  font-size:12.5px; color:var(--text-dim); padding:7px 0;
+  border-bottom:1px dashed rgba(255,255,255,.06);
+  display:flex; gap:9px;
+}
+.plan-card li:last-child { border-bottom:none; }
+.plan-card li::before { content:"·"; color:var(--rog-red); font-weight:900; }
+.plan-card li b { color:var(--text); font-weight:600; }
+.tag-new { font-size:9px; background:rgba(255,45,45,.15); color:var(--rog-red); padding:2px 7px; border-radius:4px; margin-left:auto; }
+.flow { display:flex; align-items:center; gap:0; margin-top:6px; flex-wrap:wrap; }
+.flow-step {
+  background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
+  padding:10px 14px; font-size:11.5px; text-align:center; position:relative;
+}
+.flow-step b { display:block; font-size:12px; color:var(--text); margin-bottom:3px; }
+.flow-step small { color:var(--text-faint); font-size:10px; }
+.flow-arrow { color:var(--rog-red); padding:0 10px; font-size:16px; }
+@media (max-width: 900px) {
+  .win-cards, .plan-grid { grid-template-columns: 1fr; }
+  .window-frame { flex-direction: column; height:auto; }
+  .win-side { width:100%; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>ROG <span>奥创中心</span> · macOS 原生应用原型设计稿</h1>
+    <p>Swift + SwiftUI 原生开发 · 打包为 .app 并制作 DMG 安装镜像 · 以下为交互原型，数据为模拟演示</p>
+  </div>
+
+  <!-- ① 菜单栏小部件 -->
+  <div class="section-label">① 菜单栏状态小部件 <small>常驻后台 · 实时刷新 · 三种配色方案（点击选择）</small></div>
+  <div class="menubar-mock">
+    <div class="mb-left">
+      <span class="mb-icon"></span>
+      <span class="mb-app">Finder</span>
+      <span>文件</span><span>编辑</span><span>显示</span><span>前往</span><span>帮助</span>
+    </div>
+    <div class="mb-right">
+      <span class="mb-icon">⌘</span><span class="mb-icon">🔍</span><span class="mb-icon">📶</span><span class="mb-icon">🔋</span>
+      <!-- 小部件 -->
+      <div class="sys-widget" id="widget">
+        <div class="seg"><span class="k">CPU</span><span class="v" id="w-cpu">14%</span></div>
+        <div class="seg"><span class="k">RAM</span><span class="v" id="w-ram">56%</span></div>
+        <div class="seg"><span class="k">SSD</span><span class="v" id="w-ssd">13%</span></div>
+        <div class="net">
+          <div class="row"><span class="dot up"></span><span id="w-up">7 KB/s</span></div>
+          <div class="row"><span class="dot dn"></span><span id="w-dn">5 KB/s</span></div>
+        </div>
+      </div>
+      <span class="mb-icon" style="margin-left:14px">周三</span><span class="mb-icon" id="w-clock">09:45</span>
+    </div>
+  </div>
+  <div class="hint">↑ 在真实 macOS 菜单栏中的效果：深色药丸三段显示 <b>CPU / RAM / SSD 占用</b>，右侧红点=上传速度、蓝点=下载速度，<b>每 2 秒刷新</b>，点击可弹出快速面板并打开主窗口。</div>
+
+  <div class="scheme-row" id="schemes">
+    <div class="scheme active" data-s="">
+      <div class="scheme-title">方案 A · 经典蓝灰（参考截图）<span class="tag">默认</span></div>
+      <div class="scheme-bar"><div class="sys-widget" style="transform:scale(.92)">
+        <div class="seg"><span class="k">CPU</span><span class="v">14%</span></div>
+        <div class="seg"><span class="k">RAM</span><span class="v">56%</span></div>
+        <div class="seg"><span class="k">SSD</span><span class="v">13%</span></div>
+        <div class="net"><div class="row"><span class="dot up"></span><span>7 KB/s</span></div><div class="row"><span class="dot dn"></span><span>5 KB/s</span></div></div>
+      </div></div>
+    </div>
+    <div class="scheme" data-s="rog">
+      <div class="scheme-title">方案 B · ROG 红黑电竞<span class="tag">推荐</span></div>
+      <div class="scheme-bar"><div class="sys-widget rog" style="transform:scale(.92)">
+        <div class="seg"><span class="k">CPU</span><span class="v">14%</span></div>
+        <div class="seg"><span class="k">RAM</span><span class="v">56%</span></div>
+        <div class="seg"><span class="k">SSD</span><span class="v">13%</span></div>
+        <div class="net"><div class="row"><span class="dot up"></span><span>7 KB/s</span></div><div class="row"><span class="dot dn"></span><span>5 KB/s</span></div></div>
+      </div></div>
+    </div>
+    <div class="scheme" data-s="trans">
+      <div class="scheme-title">方案 C · 半透明毛玻璃</div>
+      <div class="scheme-bar"><div class="sys-widget trans" style="transform:scale(.92)">
+        <div class="seg"><span class="k">CPU</span><span class="v">14%</span></div>
+        <div class="seg"><span class="k">RAM</span><span class="v">56%</span></div>
+        <div class="seg"><span class="k">SSD</span><span class="v">13%</span></div>
+        <div class="net"><div class="row"><span class="dot up"></span><span>7 KB/s</span></div><div class="row"><span class="dot dn"></span><span>5 KB/s</span></div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ② 主窗口 -->
+  <div class="section-label">② 主窗口控制台 <small>沿用已确认的 ROG 风格 · SwiftUI 重写为原生窗口</small></div>
+  <div class="window-frame">
+    <div class="win-side">
+      <div class="win-logo">
+        <div class="mark">R</div>
+        <div><div class="t1">ROG 奥创中心</div><div class="t2">ARMOURY CRATE</div></div>
+      </div>
+      <div class="side-item active">▦ 概览</div>
+      <div class="side-item">⚡ 性能与风扇</div>
+      <div class="side-item">⌨ 键盘灯效</div>
+      <div class="side-item">∿ 实时监控</div>
+      <div class="side-item">□ 菜单栏</div>
+      <div class="side-item">⚙ 高级</div>
+      <div class="side-item">☰ 设置</div>
+      <div class="side-item">ⓘ 关于</div>
+      <div class="side-foot"><span class="g"></span>EC 通道在线 · 传感器就绪</div>
+    </div>
+    <div class="win-main">
+      <div class="win-title-row">
+        <div>
+          <div class="win-h">概览</div>
+          <div class="win-h-sub">设备状态总览 · 更新于 09:45:50</div>
+        </div>
+      </div>
+      <div class="mini-stats">
+        <div class="mini-card"><div class="mini-k">🔥 性能模式</div><div class="mini-v" style="color:var(--rog-red)">性能</div><div class="mini-s">灯效 0x30 红</div></div>
+        <div class="mini-card"><div class="mini-k">🌡 CPU 温度</div><div class="mini-v" style="color:var(--orange)" id="m-temp">92°C</div><div class="mini-s">SMC 传感器 TC0P</div></div>
+        <div class="mini-card"><div class="mini-k">🌀 主风扇</div><div class="mini-v" style="color:var(--blue)" id="m-fan">5,923</div><div class="mini-s">RPM · SMC 读取</div></div>
+      </div>
+      <div class="win-cards">
+        <div class="win-card">
+          <h4>性能模式</h4>
+          <div class="mode-row">
+            <div class="mode-box">🌙 安静<small>静音 · 低功耗</small></div>
+            <div class="mode-box">🌓 均衡<small>日常 · 平衡</small></div>
+            <div class="mode-box active">🔥 性能<small>释放 · 满血性能</small></div>
+          </div>
+        </div>
+        <div class="win-card">
+          <h4>系统资源</h4>
+          <div class="gauge-row">
+            <div class="gauge-mini"><div class="ring" style="border:4px solid var(--rog-red); color:var(--rog-red)" id="g1">92</div><div class="lbl">CPU 温度</div></div>
+            <div class="gauge-mini"><div class="ring" style="border:4px solid var(--blue); color:var(--blue)" id="g2">14%</div><div class="lbl">内存</div></div>
+            <div class="gauge-mini"><div class="ring" style="border:4px solid var(--cyan); color:var(--cyan)" id="g3">13%</div><div class="lbl">磁盘</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 功能清单 -->
+  <div class="section-label">③ 功能清单 <small>相比网页版新增的原生能力</small></div>
+  <div class="plan-grid">
+    <div class="plan-card">
+      <h3>已实现功能（原生重写）</h3>
+      <ul>
+        <li><b>概览页</b>：设备信息、性能模式切换、风扇转速</li>
+        <li><b>实时监控</b>：圆环仪表 + 频率/温度曲线 + 核心占用</li>
+        <li><b>键盘灯效</b>：RGB 预览与颜色选择（EC 可写则真实生效）<span class="tag-new">EC 联动</span></li>
+        <li><b>性能与风扇</b>：模式切换 + 风扇曲线（读写 EC/SMC）</li>
+      </ul>
+    </div>
+    <div class="plan-card">
+      <h3>原生新增能力</h3>
+      <ul>
+        <li><b>菜单栏小部件</b>：CPU / RAM / SSD 占用 + 上传/下载网速<span class="tag-new">本次重点</span></li>
+        <li><b>真实传感器</b>：SMC 读取温度/风扇转速；host_statistics 读取 CPU/内存；statfs 读取磁盘；sysctl 读取网卡流量</li>
+        <li><b>后台常驻</b>：无 Dock 图标（LSUIElement），登录自启动（SMAppService）</li>
+        <li><b>DMG 安装包</b>：hdiutil 制作，拖入 Applications 完成安装</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ④ 技术路线 -->
+  <div class="section-label">④ 开发与打包路线 <small>纯 Swift 命令行构建，无需完整 Xcode</small></div>
+  <div class="plan-card">
+    <div class="flow">
+      <div class="flow-step"><b>① Swift 源码</b><small>SwiftUI 窗口 + MenuBarExtra 状态栏</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><b>② swiftc 编译</b><small>链接 AppKit/SwiftUI/IOKit</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><b>③ .app Bundle</b><small>Info.plist + 图标 + 代码签名</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><b>④ DMG 镜像</b><small>hdiutil 打包 · 拖拽安装</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><b>⑤ 安装运行</b><small>登录自启 · 菜单栏常驻</small></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* 方案切换 */
+const widget = document.getElementById('widget');
+document.querySelectorAll('.scheme').forEach(s => {
+  s.addEventListener('click', () => {
+    document.querySelectorAll('.scheme').forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    widget.className = 'sys-widget ' + s.dataset.s;
+  });
+});
+
+/* 模拟实时数据 */
+const rand = (a, b) => a + Math.random() * (b - a);
+setInterval(() => {
+  const cpu = Math.round(rand(5, 45));
+  const ram = Math.round(rand(50, 65));
+  const ssd = 13;
+  const up = rand(2, 40), dn = rand(5, 120);
+  const fmtSpd = v => v > 1024 ? (v/1024).toFixed(1) + ' MB/s' : Math.round(v) + ' KB/s';
+  document.getElementById('w-cpu').textContent = cpu + '%';
+  document.getElementById('w-ram').textContent = ram + '%';
+  document.getElementById('w-ssd').textContent = ssd + '%';
+  document.getElementById('w-up').textContent = fmtSpd(up);
+  document.getElementById('w-dn').textContent = fmtSpd(dn);
+  document.getElementById('w-clock').textContent = new Date().toTimeString().slice(0,5);
+  const temp = Math.round(rand(84, 96));
+  document.getElementById('m-temp').textContent = temp + '°C';
+  document.getElementById('m-fan').textContent = Math.round(rand(5600, 6300)).toLocaleString();
+  document.getElementById('g1').textContent = temp;
+  document.getElementById('g2').textContent = ram + '%';
+  document.getElementById('g3').textContent = ssd + '%';
+}, 2000);
+</script>
+</body>
+</html>

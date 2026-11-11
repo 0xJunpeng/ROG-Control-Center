@@ -1,0 +1,13 @@
+# 构建产物
+RogControlCenter/build/
+RogControlCenter/dist/
+*.dmg
+
+# 系统文件
+.DS_Store
+
+# 工作区数据
+.workbuddy/
+
+# 临时
+*.o

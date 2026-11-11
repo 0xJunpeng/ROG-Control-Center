@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROG 奥创中心 · 控制台</title>
+<style>
+:root {
+  --bg: #08080a;
+  --panel: #101014;
+  --panel-2: #16161c;
+  --line: #26262e;
+  --rog-red: #ff2d2d;
+  --rog-red-dim: #cc1f1f;
+  --text: #e8e8ec;
+  --text-dim: #8a8a96;
+  --text-faint: #55555f;
+  --green: #3ddc84;
+  --blue: #4da3ff;
+  --orange: #ffab40;
+  --cyan: #40e0e0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+  display: flex;
+}
+/* 背景网格纹理 */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,45,45,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,45,45,0.03) 1px, transparent 1px);
+  background-size: 42px 42px;
+  pointer-events: none;
+}
+
+/* ============ 侧边栏 ============ */
+.sidebar {
+  width: 232px;
+  min-width: 232px;
+  background: linear-gradient(180deg, #0d0d11 0%, #0a0a0d 100%);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+}
+.sidebar::after {
+  content: "";
+  position: absolute; top: 0; right: -1px; width: 1px; height: 180px;
+  background: linear-gradient(180deg, var(--rog-red), transparent);
+}
+.logo {
+  display: flex; align-items: center; gap: 12px;
+  padding: 26px 22px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.logo-mark {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #1c1c22, #101014);
+  border: 1px solid #33333d;
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 72% 100%, 0 100%);
+}
+.logo-mark svg { width: 26px; height: 26px; }
+.logo-name { font-size: 17px; font-weight: 700; letter-spacing: 1px; }
+.logo-sub { font-size: 10px; color: var(--rog-red); letter-spacing: 3px; margin-top: 2px; }
+
+.nav { padding: 14px 12px; flex: 1; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  position: relative;
+  transition: all .18s ease;
+  user-select: none;
+}
+.nav-item svg { width: 17px; height: 17px; flex-shrink: 0; }
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.nav-item.active {
+  color: #fff;
+  background: linear-gradient(90deg, rgba(255,45,45,0.16), rgba(255,45,45,0.04));
+}
+.nav-item.active::before {
+  content: "";
+  position: absolute; left: 0; top: 20%; height: 60%; width: 3px;
+  background: var(--rog-red);
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--rog-red);
+}
+.nav-item .dot {
+  margin-left: auto;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--rog-red);
+  box-shadow: 0 0 6px var(--rog-red);
+}
+
+.sidebar-foot {
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.ec-status { display: flex; align-items: center; gap: 8px; }
+.ec-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 50% { opacity: .4; } }
+.theme-toggle { margin-top: 12px; display: flex; gap: 8px; }
+.theme-btn {
+  flex: 1; height: 30px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .15s;
+}
+.theme-btn:hover { border-color: var(--rog-red-dim); color: var(--text); }
+.theme-btn.active { border-color: var(--rog-red); color: var(--rog-red); }
+
+/* ============ 主区域 ============ */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 30px 36px 40px;
+  position: relative;
+}
+.main::-webkit-scrollbar { width: 8px; }
+.main::-webkit-scrollbar-thumb { background: #26262e; border-radius: 4px; }
+.page { display: none; animation: fadeIn .25s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+.page-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.page-title {
+  font-size: 26px; font-weight: 800; letter-spacing: 1px;
+  display: flex; align-items: center; gap: 12px;
+}
+.page-title::before {
+  content: "";
+  width: 5px; height: 26px;
+  background: linear-gradient(180deg, var(--rog-red), #7a0f0f);
+  clip-path: polygon(0 0, 100% 0, 100% 85%, 55% 100%, 0 100%);
+  box-shadow: 0 0 10px rgba(255,45,45,.5);
+}
+.page-desc { font-size: 13px; color: var(--text-faint); margin-top: 6px; margin-left: 17px; }
+.refresh-info { font-size: 12px; color: var(--text-faint); display: flex; align-items: center; gap: 8px; }
+.refresh-icon {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); cursor: pointer; transition: .2s;
+}
+.refresh-icon:hover { border-color: var(--rog-red); color: var(--rog-red); }
+.refresh-icon.spinning svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============ 卡片 ============ */
+.card {
+  background: linear-gradient(160deg, var(--panel) 0%, #0d0d11 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: "";
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 2px;
+  background: linear-gradient(90deg, var(--rog-red) 0%, rgba(255,45,45,0.12) 34%, transparent 60%);
+  opacity: .8;
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.card-title {
+  font-size: 15px; font-weight: 700; letter-spacing: .5px;
+  display: flex; align-items: center; gap: 10px;
+}
+.card-title::before {
+  content: "";
+  width: 4px; height: 15px;
+  background: var(--rog-red);
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 100%);
+}
+.card-meta { font-size: 12px; color: var(--text-faint); }
+
+/* 概览 - 设备卡片 */
+.device-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.device-label { font-size: 12px; color: var(--text-faint); margin-bottom: 6px; }
+.device-name { font-size: 17px; font-weight: 700; }
+.device-id { font-size: 12px; color: var(--text-faint); font-family: "SF Mono", monospace; }
+.badges { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+  color: var(--text-dim);
+}
+.badge.on { border-color: rgba(61,220,132,.4); color: var(--green); background: rgba(61,220,132,.06); }
+.badge.off { opacity: .55; }
+.badge .b-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* 概览 - 三列信息卡 */
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+.stat-card {
+  background: linear-gradient(160deg, var(--panel-2) 0%, var(--panel) 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::after {
+  content: "";
+  position: absolute; right: -30px; top: -30px;
+  width: 110px; height: 110px;
+  background: radial-gradient(circle, rgba(255,45,45,.10), transparent 70%);
+}
+.stat-label { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 7px; }
+.stat-label svg { width: 14px; height: 14px; }
+.stat-value {
+  font-size: 34px; font-weight: 800;
+  margin-top: 10px;
+  font-family: "SF Mono", "DIN Alternate", monospace;
+  letter-spacing: 1px;
+}
+.stat-unit { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+.v-red { color: var(--rog-red); text-shadow: 0 0 18px rgba(255,45,45,.45); }
+.v-blue { color: var(--blue); text-shadow: 0 0 18px rgba(77,163,255,.35); }
+.v-cyan { color: var(--cyan); text-shadow: 0 0 18px rgba(64,224,224,.35); }
+
+/* 性能模式选择 */
+.mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.mode-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 22px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s ease;
+  position: relative;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+.mode-card:hover { border-color: #3a3a44; transform: translateY(-2px); }
+.mode-card.active {
+  border-color: var(--rog-red);
+  background: linear-gradient(160deg, rgba(255,45,45,.14), rgba(255,45,45,.03));
+  box-shadow: 0 0 22px rgba(255,45,45,.18), inset 0 0 20px rgba(255,45,45,.05);
+}
+.mode-icon { font-size: 24px; margin-bottom: 10px; }
+.mode-name { font-size: 15px; font-weight: 700; }
+.mode-card.active .mode-name { color: var(--rog-red); }
+.mode-desc { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+.mode-note { font-size: 12px; color: var(--text-faint); margin-top: 16px; }
+.mode-note b { color: var(--rog-red); font-weight: 600; }
+
+/* 风扇转速 */
+.fan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fan-item {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.fan-name { font-size: 12px; color: var(--text-dim); letter-spacing: 2px; }
+.fan-rpm {
+  font-size: 40px; font-weight: 800;
+  font-family: "SF Mono", monospace;
+  margin: 8px 0 4px;
+  color: var(--text);
+  text-shadow: 0 0 22px rgba(255,255,255,.12);
+}
+.fan-unit { font-size: 11px; color: var(--text-faint); letter-spacing: 2px; }
+.fan-bar {
+  margin-top: 14px; height: 5px;
+  background: #1e1e26; border-radius: 3px;
+  overflow: hidden;
+}
+.fan-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #7a0f0f, var(--rog-red));
+  border-radius: 3px;
+  transition: width .8s cubic-bezier(.2,.8,.3,1);
+  box-shadow: 0 0 8px rgba(255,45,45,.6);
+}
+
+/* ============ 监控页 ============ */
+.gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+.gauge-card {
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px;
+  text-align: center;
+}
+.gauge-title { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; letter-spacing: 1px; }
+.gauge-wrap { position: relative; width: 132px; height: 132px; margin: 0 auto; }
+.gauge-wrap svg { transform: rotate(-90deg); }
+.gauge-bg { stroke: #1e1e26; }
+.gauge-val {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.gauge-num {
+  font-size: 30px; font-weight: 800;
+  font-family: "SF Mono", monospace;
+}
+.gauge-sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+.gauge-foot { margin-top: 14px; font-size: 12px; color: var(--text-faint); }
+.gauge-foot b { color: var(--text-dim); font-weight: 600; }
+
+/* 图表卡片 */
+.chart-wrap { position: relative; }
+.chart-legend {
+  position: absolute; top: 0; right: 0;
+  font-size: 12px; color: var(--text-faint);
+}
+.chart-legend b { color: var(--text-dim); }
+.core-bar-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 6px;
+}
+.core-bar-label { font-size: 10px; color: var(--text-faint); width: 34px; font-family: monospace; }
+.core-bar-track {
+  flex: 1; height: 12px;
+  background: #1a1a22;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.core-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1d7a4c, var(--green));
+  border-radius: 3px;
+  transition: width .5s ease;
+  width: 0%;
+}
+.core-bar-fill.hot { background: linear-gradient(90deg, #7a5a1d, var(--orange)); }
+.core-bar-fill.crit { background: linear-gradient(90deg, #7a1d1d, var(--rog-red)); }
+.core-bar-val { font-size: 10px; color: var(--text-faint); width: 34px; text-align: right; font-family: monospace; }
+.core-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px; margin-top: 8px; }
+
+/* 键盘灯效页占位 */
+.kbd-preview {
+  height: 120px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #0a0a0d;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.kbd-rows { display: flex; flex-direction: column; gap: 7px; }
+.kbd-row { display: flex; gap: 7px; justify-content: center; }
+.kbd-key {
+  width: 34px; height: 26px;
+  border-radius: 4px;
+  background: #16161c;
+  border: 1px solid #22222a;
+  transition: background .6s, box-shadow .6s;
+}
+.led-colors { display: flex; gap: 12px; margin-top: 16px; }
+.led-swatch {
+  width: 34px; height: 34px; border-radius: 8px;
+  cursor: pointer; border: 2px solid transparent;
+  transition: .15s;
+}
+.led-swatch.active { border-color: #fff; transform: scale(1.1); }
+
+@media (max-width: 1100px) {
+  .grid-3, .gauge-grid, .mode-grid { grid-template-columns: 1fr; }
+  .fan-grid, .core-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 侧边栏 ============ -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M3 7 L10 4 L21 4 L18 9 L11 9 L11 13 L16 13 L14.5 17 L11 17 L11 20 L3 20 Z" fill="#ff2d2d"/>
+        <path d="M13 6 L20 6 L18.2 9.4 L12.5 9.4 Z" fill="#0a0a0d" opacity=".85"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-name">ROG 奥创中心</div>
+      <div class="logo-sub">ARMOURY CRATE</div>
+    </div>
+  </div>
+
+  <nav class="nav" id="nav">
+    <div class="nav-item active" data-page="overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+      概览 <span class="dot"></span>
+    </div>
+    <div class="nav-item" data-page="perf">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg>
+      性能与风扇
+    </div>
+    <div class="nav-item" data-page="keyboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10 h.01 M10 10 h.01 M14 10 h.01 M18 10 h.01 M6 14 h12"/></svg>
+      键盘灯效
+    </div>
+    <div class="nav-item" data-page="monitor">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12 h4 l2.5 -7 4 14 2.5 -7 h5"/></svg>
+      实时监控
+    </div>
+    <div class="nav-item" data-page="menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9 h18 M9 9 v11"/></svg>
+      菜单栏
+    </div>
+    <div class="nav-item" data-page="advanced">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6 h16 M4 12 h16 M4 18 h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="7" cy="18" r="2" fill="currentColor"/></svg>
+      高级
+    </div>
+    <div class="nav-item" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2 v3 M12 19 v3 M2 12 h3 M19 12 h3 M4.9 4.9 l2.1 2.1 M17 17 l2.1 2.1 M19.1 4.9 L17 7 M7 17 l-2.1 2.1"/></svg>
+      设置
+    </div>
+    <div class="nav-item" data-page="about">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8 h.01 M12 11 v5"/></svg>
+      关于
+    </div>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="ec-status"><span class="ec-dot"></span> EC 通道在线</div>
+    <div class="theme-toggle">
+      <button class="theme-btn active">🌙 静音</button>
+      <button class="theme-btn">⚡ 均衡</button>
+      <button class="theme-btn">🔥 性能</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ============ 主区域 ============ -->
+<main class="main">
+
+  <!-- ===== 概览页 ===== -->
+  <section class="page active" id="page-overview">
+    <div class="page-header">
+      <div>
+        <div class="page-title">概览</div>
+        <div class="page-desc">设备状态总览</div>
+      </div>
+      <div class="refresh-info">更新于 <span id="ov-time">--:--:--</span>
+        <div class="refresh-icon" onclick="refreshAll(this)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12 a9 9 0 1 1 -2.6 -6.3 M21 3 v6 h-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="stat-card">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg> 性能模式</div>
+        <div class="stat-value v-red" id="ov-mode">性能</div>
+        <div class="stat-unit">灯效 <span id="ov-mode-sub">0x30 红</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7 v5 l3 3"/></svg> 主风扇</div>
+        <div class="stat-value v-blue" id="ov-fan1">5,923</div>
+        <div class="stat-unit">RPM</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 v18 M5 8 l7 -5 7 5 M5 16 l7 5 7 -5"/></svg> 副风扇</div>
+        <div class="stat-value v-cyan" id="ov-fan2">6,033</div>
+        <div class="stat-unit">RPM</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">设备</div>
+        <div class="card-meta">ProjectID <span style="font-family:monospace">0x1a</span></div>
+      </div>
+      <div class="device-row">
+        <div>
+          <div class="device-label">识别</div>
+          <div class="device-name">ROG 幻16 · 2026 (奥创控制台)</div>
+        </div>
+        <div class="device-id">FW 1.08.06 · EC 1.06</div>
+      </div>
+      <div class="badges">
+        <span class="badge on"><span class="b-dot"></span>AURA 灯效 ✓</span>
+        <span class="badge on"><span class="b-dot"></span>风扇增强 ✓</span>
+        <span class="badge off">液金导热 ✕</span>
+        <span class="badge off">雷电扩展 ✕</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">性能模式</div>
+        <div class="card-meta">灯效 <span id="ov-mode-tag">0x30 红</span></div>
+      </div>
+      <div class="mode-grid">
+        <div class="mode-card" data-mode="安静">
+          <div class="mode-icon">🌙</div>
+          <div class="mode-name">安静</div>
+          <div class="mode-desc">静音 · 低功耗</div>
+        </div>
+        <div class="mode-card" data-mode="均衡">
+          <div class="mode-icon">🌓</div>
+          <div class="mode-name">均衡</div>
+          <div class="mode-desc">日常 · 平衡</div>
+        </div>
+        <div class="mode-card active" data-mode="性能">
+          <div class="mode-icon">🔥</div>
+          <div class="mode-name">性能</div>
+          <div class="mode-desc">释放 · 满血性能</div>
+        </div>
+      </div>
+      <div class="mode-note">切换快捷键 <b>Fn + N</b>（性能档）；本页演示，不向下写入 EC。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">风扇</div>
+        <div class="card-meta">占空比 <span id="ov-duty">200/255</span></div>
+      </div>
+      <div class="fan-grid">
+        <div class="fan-item">
+          <div class="fan-name">CPU</div>
+          <div class="fan-rpm" id="fan1-big">5,923</div>
+          <div class="fan-unit">RPM</div>
+          <div class="fan-bar"><div id="fan1-bar" style="width:78%"></div></div>
+        </div>
+        <div class="fan-item">
+          <div class="fan-name">GPU</div>
+          <div class="fan-rpm" id="fan2-big">6,033</div>
+          <div class="fan-unit">RPM</div>
+          <div class="fan-bar"><div id="fan2-bar" style="width:81%"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 实时监控页 ===== -->
+  <section class="page" id="page-monitor">
+    <div class="page-header">
+      <div>
+        <div class="page-title">实时监控</div>
+        <div class="page-desc">每秒采样一次 · 模拟数据流</div>
+      </div>
+      <div class="refresh-info">更新于 <span id="mo-time">--:--:--</span>
+        <div class="refresh-icon" onclick="refreshAll(this)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12 a9 9 0 1 1 -2.6 -6.3 M21 3 v6 h-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="gauge-grid">
+      <div class="gauge-card">
+        <div class="gauge-title">CPU 温度</div>
+        <div class="gauge-wrap">
+          <svg width="132" height="132" viewBox="0 0 132 132">
+            <circle class="gauge-bg" cx="66" cy="66" r="56" fill="none" stroke-width="10"/>
+            <circle id="g-temp" cx="66" cy="66" r="56" fill="none" stroke="#ff2d2d" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="351.9" stroke-dashoffset="351.9"
+              style="filter: drop-shadow(0 0 6px rgba(255,45,45,.7)); transition: stroke-dashoffset .8s ease;"/>
+          </svg>
+          <div class="gauge-val">
+            <div class="gauge-num" id="v-temp" style="color:var(--rog-red)">92</div>
+            <div class="gauge-sub">°C</div>
+          </div>
+        </div>
+        <div class="gauge-foot"><b id="v-freq">3.52</b> GHz · TDP <b id="v-tdp">53</b> W</div>
+      </div>
+      <div class="gauge-card">
+        <div class="gauge-title">CPU 占用</div>
+        <div class="gauge-wrap">
+          <svg width="132" height="132" viewBox="0 0 132 132">
+            <circle class="gauge-bg" cx="66" cy="66" r="56" fill="none" stroke-width="10"/>
+            <circle id="g-cpu" cx="66" cy="66" r="56" fill="none" stroke="#4da3ff" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="351.9" stroke-dashoffset="351.9"
+              style="filter: drop-shadow(0 0 6px rgba(77,163,255,.7)); transition: stroke-dashoffset .8s ease;"/>
+          </svg>
+          <div class="gauge-val">
+            <div class="gauge-num" id="v-cpu" style="color:var(--blue)">5</div>
+            <div class="gauge-sub">%</div>
+          </div>
+        </div>
+        <div class="gauge-foot">负载 <b id="v-load">3.36</b> · 32 线程</div>
+      </div>
+      <div class="gauge-card">
+        <div class="gauge-title">GPU 占用</div>
+        <div class="gauge-wrap">
+          <svg width="132" height="132" viewBox="0 0 132 132">
+            <circle class="gauge-bg" cx="66" cy="66" r="56" fill="none" stroke-width="10"/>
+            <circle id="g-gpu" cx="66" cy="66" r="56" fill="none" stroke="#40e0e0" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="351.9" stroke-dashoffset="351.9"
+              style="filter: drop-shadow(0 0 6px rgba(64,224,224,.7)); transition: stroke-dashoffset .8s ease;"/>
+          </svg>
+          <div class="gauge-val">
+            <div class="gauge-num" id="v-gpu" style="color:var(--cyan)">18</div>
+            <div class="gauge-sub">%</div>
+          </div>
+        </div>
+        <div class="gauge-foot">显存 <b id="v-vram">1</b> % · NVIDIA</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">CPU 频率曲线</div>
+        <div class="card-meta">峰值 <b id="v-freq-max" style="color:var(--green)">4.92</b> GHz</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-freq" height="120"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">核心占用</div>
+        <div class="card-meta">32 线程 · 压力正常</div>
+      </div>
+      <div class="core-grid" id="core-grid"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">CPU 温度曲线</div>
+        <div class="card-meta">当前 <b id="v-temp2" style="color:var(--rog-red)">92.0</b> °C</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-temp" height="100"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 性能与风扇页 ===== -->
+  <section class="page" id="page-perf">
+    <div class="page-header">
+      <div>
+        <div class="page-title">性能与风扇</div>
+        <div class="page-desc">自定义风扇曲线与功耗释放</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">风扇模式</div>
+      </div>
+      <div class="mode-grid">
+        <div class="mode-card"><div class="mode-icon">🤖</div><div class="mode-name">自动</div><div class="mode-desc">跟随温度智能调速</div></div>
+        <div class="mode-card active"><div class="mode-icon">📈</div><div class="mode-name">曲线</div><div class="mode-desc">自定义转速曲线</div></div>
+        <div class="mode-card"><div class="mode-icon">🌙</div><div class="mode-name">静音</div><div class="mode-desc">上限 40% 转速</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">功耗上限 (PL1 / PL2)</div>
+        <div class="card-meta">单位: W</div>
+      </div>
+      <div class="core-grid">
+        <div class="core-bar-row"><span class="core-bar-label">PL1</span><div class="core-bar-track"><div class="core-bar-fill hot" style="width:84%"></div></div><span class="core-bar-val">45W</span></div>
+        <div class="core-bar-row"><span class="core-bar-label">PL2</span><div class="core-bar-track"><div class="core-bar-fill crit" style="width:100%"></div></div><span class="core-bar-val">115W</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 键盘灯效页 ===== -->
+  <section class="page" id="page-keyboard">
+    <div class="page-header">
+      <div>
+        <div class="page-title">键盘灯效</div>
+        <div class="page-desc">AURA SYNC · 单区 RGB</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">灯效预览</div>
+        <div class="card-meta">当前灯效 <span id="led-name" style="color:var(--rog-red)">静态红</span></div>
+      </div>
+      <div class="kbd-preview">
+        <div class="kbd-rows" id="kbd"></div>
+      </div>
+      <div class="led-colors" id="led-colors">
+        <div class="led-swatch active" data-c="#ff2d2d" data-n="静态红" style="background:#ff2d2d"></div>
+        <div class="led-swatch" data-c="#ff7a00" data-n="静态橙" style="background:#ff7a00"></div>
+        <div class="led-swatch" data-c="#ffd400" data-n="静态黄" style="background:#ffd400"></div>
+        <div class="led-swatch" data-c="#3ddc84" data-n="静态绿" style="background:#3ddc84"></div>
+        <div class="led-swatch" data-c="#4da3ff" data-n="静态蓝" style="background:#4da3ff"></div>
+        <div class="led-swatch" data-c="#a44dff" data-n="静态紫" style="background:#a44dff"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 其他占位页 ===== -->
+  <section class="page" id="page-menu">
+    <div class="page-header"><div><div class="page-title">菜单栏</div><div class="page-desc">菜单栏快捷小组件</div></div></div>
+    <div class="card"><div class="card-title">此页面为演示占位</div></div>
+  </section>
+  <section class="page" id="page-advanced">
+    <div class="page-header"><div><div class="page-title">高级</div><div class="page-desc">高级电源与硬件选项</div></div></div>
+    <div class="card"><div class="card-title">此页面为演示占位</div></div>
+  </section>
+  <section class="page" id="page-settings">
+    <div class="page-header"><div><div class="page-title">设置</div><div class="page-desc">应用偏好设置</div></div></div>
+    <div class="card"><div class="card-title">此页面为演示占位</div></div>
+  </section>
+  <section class="page" id="page-about">
+    <div class="page-header"><div><div class="page-title">关于</div><div class="page-desc">版本信息</div></div></div>
+    <div class="card">
+      <div class="card-title">ROG 奥创中心 · 控制台 Demo</div>
+      <div class="mode-note" style="margin-top:10px">版本 1.0.0 · UI 设计稿 · 数据均为模拟，不与真实硬件通信。</div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ================= 页面切换 ================= */
+const navItems = document.querySelectorAll('.nav-item');
+navItems.forEach(item => {
+  item.addEventListener('click', () => {
+    navItems.forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + item.dataset.page).classList.add('active');
+    if (item.dataset.page === 'monitor') drawCharts();
+  });
+});
+
+/* ================= 性能模式切换 ================= */
+const modeCards = document.querySelectorAll('.mode-card[data-mode]');
+modeCards.forEach(card => {
+  card.addEventListener('click', () => {
+    modeCards.forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    const mode = card.dataset.mode;
+    document.getElementById('ov-mode').textContent = mode;
+    const tag = mode === '性能' ? '0x30 红' : mode === '均衡' ? '0x31 橙' : '0x32 绿';
+    document.getElementById('ov-mode-tag').textContent = tag;
+    document.getElementById('ov-mode-sub').textContent = tag;
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    const idx = mode === '性能' ? 2 : mode === '均衡' ? 1 : 0;
+    document.querySelectorAll('.theme-btn')[idx].classList.add('active');
+    // 性能档风扇更猛
+    targetFan = mode === '性能' ? 5900 : mode === '均衡' ? 3800 : 2600;
+  });
+});
+
+/* ================= 键盘灯效 ================= */
+const kbdEl = document.getElementById('kbd');
+const rows = [14, 14, 13, 12, 8];
+rows.forEach(n => {
+  const row = document.createElement('div');
+  row.className = 'kbd-row';
+  for (let i = 0; i < n; i++) {
+    const k = document.createElement('div');
+    k.className = 'kbd-key';
+    row.appendChild(k);
+  }
+  kbdEl.appendChild(row);
+});
+let ledColor = '#ff2d2d';
+function applyLed() {
+  document.querySelectorAll('.kbd-key').forEach((k, i) => {
+    k.style.background = ledColor;
+    k.style.boxShadow = '0 0 8px ' + ledColor + '88';
+    k.style.transitionDelay = (i % 7) * 40 + 'ms';
+  });
+}
+document.querySelectorAll('.led-swatch').forEach(s => {
+  s.addEventListener('click', () => {
+    document.querySelectorAll('.led-swatch').forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    ledColor = s.dataset.c;
+    document.getElementById('led-name').textContent = s.dataset.n;
+    applyLed();
+  });
+});
+applyLed();
+
+/* ================= 模拟数据引擎 ================= */
+let targetFan = 5900;
+let fan1 = 5923, fan2 = 6033;
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+/* 频率 / 温度历史 */
+const HIST = 60;
+const freqHist = Array(HIST).fill(3.5);
+const tempHist = Array(HIST).fill(80);
+
+/* 核心占用 */
+const coreGrid = $('core-grid');
+const CORE_N = 8;
+const coreFills = [], coreVals = [];
+for (let i = 0; i < CORE_N; i++) {
+  const row = document.createElement('div');
+  row.className = 'core-bar-row';
+  row.innerHTML = `<span class="core-bar-label">CPU${i}</span>
+    <div class="core-bar-track"><div class="core-bar-fill"></div></div>
+    <span class="core-bar-val">0%</span>`;
+  coreGrid.appendChild(row);
+  coreFills.push(row.querySelector('.core-bar-fill'));
+  coreVals.push(row.querySelector('.core-bar-val'));
+}
+
+/* 圆环仪表 */
+function setGauge(id, valId, val, max, colorCls) {
+  const C = 2 * Math.PI * 56; // 351.86
+  const el = $(id);
+  el.style.strokeDashoffset = C * (1 - clamp(val / max, 0, 1));
+  $(valId).textContent = colorCls ? Math.round(val) : Math.round(val);
+}
+
+function tick() {
+  const now = new Date();
+  const t = now.toTimeString().slice(0, 8);
+  $('ov-time').textContent = t;
+  $('mo-time').textContent = t;
+
+  // 温度: 性能档高温徘徊 88-96
+  const temp = clamp(92 + Math.sin(Date.now() / 4000) * 3 + (Math.random() - 0.5) * 1.6, 78, 99);
+  // 频率 3.4-4.9
+  const freq = clamp(4.2 + Math.sin(Date.now() / 6000) * 0.5 + (Math.random() - 0.5) * 0.3, 3.2, 4.92);
+  // CPU 占用 5-45 偶尔尖峰
+  const cpu = clamp(8 + Math.abs(Math.sin(Date.now() / 9000)) * 25 + (Math.random() < 0.05 ? 40 : 0), 2, 98);
+  const gpu = clamp(15 + Math.abs(Math.cos(Date.now() / 11000)) * 22 + (Math.random() - 0.5) * 6, 1, 99);
+  const tdp = clamp(38 + temp - 80 + Math.random() * 4, 35, 65);
+  const load = (1 + Math.random() * 4).toFixed(2);
+
+  // 风扇逼近目标
+  fan1 += (targetFan - fan1) * 0.06 + (Math.random() - 0.5) * 60;
+  fan2 += (targetFan + 110 - fan2) * 0.06 + (Math.random() - 0.5) * 60;
+
+  setGauge('g-temp', 'v-temp', temp, 100);
+  setGauge('g-cpu', 'v-cpu', cpu, 100);
+  setGauge('g-gpu', 'v-gpu', gpu, 100);
+  $('v-freq').textContent = freq.toFixed(2);
+  $('v-tdp').textContent = Math.round(tdp);
+  $('v-load').textContent = load;
+  $('v-vram').textContent = Math.round(gpu / 12);
+  $('v-freq-max').textContent = Math.max(freq, parseFloat($('v-freq-max').textContent)).toFixed(2);
+  $('v-temp2').textContent = temp.toFixed(1);
+
+  $('ov-fan1').textContent = fmt(fan1);
+  $('ov-fan2').textContent = fmt(fan2);
+  $('fan1-big').textContent = fmt(fan1);
+  $('fan2-big').textContent = fmt(fan2);
+  const duty = Math.round(fan1 / 6350 * 255);
+  $('ov-duty').textContent = duty + '/255';
+  $('fan1-bar').style.width = (fan1 / 6350 * 100) + '%';
+  $('fan2-bar').style.width = (fan2 / 6350 * 100) + '%';
+
+  // 核心
+  coreFills.forEach((f, i) => {
+    const v = clamp(cpu * (0.4 + Math.random() * 1.4), 0, 100);
+    f.style.width = v + '%';
+    f.className = 'core-bar-fill' + (v > 80 ? ' crit' : v > 50 ? ' hot' : '');
+    coreVals[i].textContent = Math.round(v) + '%';
+  });
+
+  // 历史
+  freqHist.push(freq); freqHist.shift();
+  tempHist.push(temp); tempHist.shift();
+  if (document.getElementById('page-monitor').classList.contains('active')) drawCharts();
+}
+
+/* ================= Canvas 曲线图 ================= */
+function drawLine(canvas, data, color, glow, min, max) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = parseInt(canvas.getAttribute('height'));
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath(); ctx.moveTo(0, h / 4 * i); ctx.lineTo(w, h / 4 * i); ctx.stroke();
+  }
+
+  const pad = 6;
+  const xStep = w / (HIST - 1);
+  const yOf = v => h - pad - (v - min) / (max - min) * (h - pad * 2);
+
+  // 填充
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, glow); grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  data.forEach((v, i) => { const x = i * xStep, y = yOf(v); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // 线
+  ctx.beginPath();
+  data.forEach((v, i) => { const x = i * xStep, y = yOf(v); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.shadowColor = color; ctx.shadowBlur = 8;
+  ctx.stroke();
+}
+function drawCharts() {
+  drawLine($('chart-freq'), freqHist, '#3ddc84', 'rgba(61,220,132,0.18)', 3.0, 5.1);
+  drawLine($('chart-temp'), tempHist, '#ffab40', 'rgba(255,171,64,0.18)', 70, 100);
+}
+
+/* ================= 刷新按钮 ================= */
+function refreshAll(icon) {
+  icon.classList.add('spinning');
+  setTimeout(() => icon.classList.remove('spinning'), 800);
+  tick();
+}
+
+setInterval(tick, 1000);
+tick();
+window.addEventListener('resize', () => {
+  if (document.getElementById('page-monitor').classList.contains('active')) drawCharts();
+});
+</script>
+</body>
+</html>
