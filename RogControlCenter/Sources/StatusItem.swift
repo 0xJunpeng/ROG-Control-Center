@@ -22,6 +22,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var hostingView: NSView?
     private let menu = NSMenu()
+    private var statLine1: NSMenuItem?
+    private var statLine2: NSMenuItem?
 
     private override init() { super.init() }
 
@@ -69,6 +71,19 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func rebuildMenuItems() {
         menu.removeAllItems()
 
+        // 顶部实时数据（不可点击，等价于原来的详情面板摘要）
+        let s1 = NSMenuItem(title: "正在读取…", action: nil, keyEquivalent: "")
+        s1.isEnabled = false
+        menu.addItem(s1)
+        statLine1 = s1
+
+        let s2 = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        s2.isEnabled = false
+        menu.addItem(s2)
+        statLine2 = s2
+
+        menu.addItem(.separator())
+
         let open = NSMenuItem(title: "打开控制台", action: #selector(menuOpenConsole), keyEquivalent: "o")
         open.target = self
         menu.addItem(open)
@@ -85,8 +100,33 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(quit)
     }
 
+    private func smallFont(_ item: NSMenuItem) {
+        let attr: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        ]
+        item.attributedTitle = NSAttributedString(string: item.title, attributes: attr)
+    }
+
     // 菜单即将显示时刷新状态
     func menuNeedsUpdate(_ menu: NSMenu) {
+        let m = SystemMonitor.shared
+        if let s1 = statLine1 {
+            s1.title = String(format: "CPU %2.0f%%   内存 %.0f%%   磁盘 %.0f%%",
+                              m.cpuUsage, m.ramUsage, m.diskUsage)
+            smallFont(s1)
+        }
+        if let s2 = statLine2 {
+            var parts: [String] = []
+            if m.cpuTemp > 0 { parts.append(String(format: "温度 %.0f°C", m.cpuTemp)) }
+            if m.cpuPowerW > 0 { parts.append(String(format: "CPU %.1fW", m.cpuPowerW)) }
+            if m.battValid { parts.append(String(format: "电池 %.1fW", abs(m.battWatts))) }
+            let net = m.upSpeed >= 1 || m.downSpeed >= 1
+                ? String(format: "↑%.0f ↓%.0f KB/s", m.upSpeed, m.downSpeed)
+                : ""
+            parts.append(net.isEmpty ? "网络空闲" : net)
+            s2.title = parts.isEmpty ? "无传感器数据" : parts.joined(separator: "   ")
+            smallFont(s2)
+        }
         if let login = menu.items.first(where: { $0.action == #selector(menuToggleLogin) }) {
             login.state = SMAppServiceCheck.isEnabled ? .on : .off
         }

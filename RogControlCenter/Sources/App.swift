@@ -215,89 +215,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
 
-    /// 用 CGWindowList 检测窗口是否真的渲染在屏幕上（isVisible 会对「卡在别的 Space」的窗口撒谎）
-    private static func isWindowOnScreen(_ w: NSWindow) -> Bool {
-        let opts = CGWindowListOption(arrayLiteral: .optionOnScreenOnly, .excludeDesktopElements)
-        guard let list = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] else { return true }
-        let pid = ProcessInfo.processInfo.processIdentifier
-        return list.contains { info in
-            guard let wpid = info[kCGWindowOwnerPID as String] as? Int,
-                  let num = info[kCGWindowNumber as String] as? Int else { return false }
-            return wpid == pid && num == w.windowNumber
-        }
-    }
-
-    /// 检测并清理「自称可见但实际不在屏上」的僵尸窗口（卡在其他 Space）
+    /// 清理旧窗口：一律 orderOut（旧窗口可能被钉在不可见 Space 且 macOS 26 无法检测）
     private func reapZombieWindow() {
-        if let w = window, w.isVisible, !Self.isWindowOnScreen(w) {
-            diagLog("zombie window detected, recreating (frame=\(w.frame))")
+        if let w = window {
             w.orderOut(nil)
-            window = nil   // 丢弃重建：新窗口必然创建在当前空间
+            window = nil
         }
     }
 
     func showConsole() {
         reapZombieWindow()
-        if window == nil { window = makeWindow() }
-        guard let w = window else { return }
 
-        // 关键修复：accessory 应用即使 makeKeyAndOrderFront + activate 也很容易被
-        // 判定为「不可激活」而留在其他 App 后面（表现为点了没反应）。
-        // 控制台打开期间切回 .regular（获得正常激活能力），关窗时再切回 .accessory。
+        // 关键修复：accessory 应用无法正常激活。先切 .regular 并激活 App，
+        // 让 App 成为当前空间的活跃应用，之后再创建窗口。
         NSApp.setActivationPolicy(.regular)
-
-        // 历史 frame 可能落在已断开的显示器上，或超出当前屏幕边界 → 居中/钳制
-        if let screen = NSScreen.main ?? NSScreen.screens.first {
-            let v = screen.visibleFrame
-            let c = NSPoint(x: w.frame.midX, y: w.frame.midY)
-            if !v.contains(c) || w.frame.width > v.width || w.frame.height > v.height {
-                w.center()
-            } else {
-                var f = w.frame
-                f.origin.x = min(max(f.minX, v.minX), v.maxX - f.width)
-                f.origin.y = min(max(f.minY, v.minY), v.maxY - f.height)
-                if f != w.frame { w.setFrame(f, display: true) }
-            }
-        }
-
-        // fullScreenAuxiliary：即使当前 Space 是全屏 App 也允许浮在上面
-        w.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         if NSApp.isHidden { NSApp.unhide(nil) }
-        w.level = .floating   // 先置顶确保可见，激活成功后回落
-        w.makeKeyAndOrderFront(nil)
-        w.orderFrontRegardless()
-
-        // 激活策略切换后需要短暂的 runloop 周期才能生效，分两次尝试激活
         NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NSRunningApplication.current.activate(options: [.activateAllWindows])
-            w.makeKeyAndOrderFront(nil)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self, weak w] in
-            guard let self, let w else { return }
-            w.level = .normal
-            let onscreen = Self.isWindowOnScreen(w)
-            if !onscreen {
-                // 自愈兜底：仍卡在别的 Space → 销毁重建，新窗口必然落在当前空间
-                diagLog("self-heal: window still offscreen, recreating")
-                w.orderOut(nil)
-                self.window = nil
-                self.showConsole()
-                return
-            }
-            if w.isVisible && !w.isKeyWindow {
-                // 二次激活兜底
-                NSApp.activate(ignoringOtherApps: true)
-                w.makeKeyAndOrderFront(nil)
-            }
-            self.diagLog("showConsole visible=\(w.isVisible) onscreen=\(onscreen) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) policy=\(NSApp.activationPolicy().rawValue) frame=\(w.frame)")
-        }
 
-        if CommandLine.arguments.contains("--diag-open") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                let line = "DIAG visible=\(w.isVisible) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) frame=\(w.frame) screens=\(NSScreen.screens.count) policy=\(NSApp.activationPolicy().rawValue)"
-                try? line.write(toFile: "/tmp/rog-diag.txt", atomically: true, encoding: .utf8)
-                print(line)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self else { return }
+            let w = self.makeWindow()
+            self.window = w
+
+            // 历史 frame 可能超出屏幕边界 → 居中/钳制
+            if let screen = NSScreen.main ?? NSScreen.screens.first {
+                let v = screen.visibleFrame
+                let c = NSPoint(x: w.frame.midX, y: w.frame.midY)
+                if !v.contains(c) || w.frame.width > v.width || w.frame.height > v.height {
+                    w.center()
+                } else {
+                    var f = w.frame
+                    f.origin.x = min(max(f.minX, v.minX), v.maxX - f.width)
+                    f.origin.y = min(max(f.minY, v.minY), v.maxY - f.height)
+                    if f != w.frame { w.setFrame(f, display: true) }
+                }
+            }
+
+            // 终极方案：窗口常驻所有 Space（含全屏 App 上方）。
+            // macOS 26 下实测新窗口会被分到不可见 Space 且无法检测/纠正，
+            // canJoinAllSpaces 是唯一保证「用户在哪个桌面都能看到」的手段。
+            w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            w.level = .floating   // 先置顶确保可见，激活成功后回落
+            w.makeKeyAndOrderFront(nil)
+            w.orderFrontRegardless()
+            NSRunningApplication.current.activate(options: [.activateAllWindows])
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak w] in
+                guard let self, let w else { return }
+                w.level = .normal
+                if !w.isKeyWindow {
+                    NSApp.activate(ignoringOtherApps: true)
+                    w.makeKeyAndOrderFront(nil)
+                }
+                self.diagLog("showConsole visible=\(w.isVisible) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) policy=\(NSApp.activationPolicy().rawValue) frame=\(w.frame) winNum=\(w.windowNumber)")
+            }
+
+            if CommandLine.arguments.contains("--diag-open") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    let line = "DIAG visible=\(w.isVisible) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) frame=\(w.frame) screens=\(NSScreen.screens.count) policy=\(NSApp.activationPolicy().rawValue)"
+                    try? line.write(toFile: "/tmp/rog-diag.txt", atomically: true, encoding: .utf8)
+                    print(line)
+                }
             }
         }
     }
