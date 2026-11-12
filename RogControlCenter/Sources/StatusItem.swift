@@ -6,17 +6,22 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-// MARK: - 状态栏控制器：NSStatusItem + 自定义彩色视图 + NSPopover 面板
+// MARK: - 状态栏控制器：NSStatusItem + 自定义彩色视图 + 系统菜单
 //
 // 说明：SwiftUI 的 MenuBarExtra(label:) 会把自定义视图渲染成「模板图片」，
 // 颜色会被抹掉、复杂布局会被裁切（表现为只剩第一段文字）。
 // 因此这里直接用 AppKit 的 NSStatusItem 承载 NSHostingView，保留完整颜色与布局。
-final class StatusItemController: NSObject, NSPopoverDelegate {
+//
+// 重要（macOS 26 Tahoe）：第三方状态项的点击被系统交给「控制中心」进程托管
+// （CGWindowList 显示状态项窗口 owner=控制中心），按钮的 target/action 直连
+// 通道会被架空 —— 表现为「点击没反应」。解决：给 NSStatusItem 挂 NSMenu，
+// 菜单由系统菜单机制处理，在托管模式下依然 100% 可靠。
+final class StatusItemController: NSObject, NSMenuDelegate {
     static let shared = StatusItemController()
 
     private var statusItem: NSStatusItem?
     private var hostingView: NSView?
-    private let popover = NSPopover()
+    private let menu = NSMenu()
 
     private override init() { super.init() }
 
@@ -34,13 +39,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
         button.title = ""
         button.image = nil
-        button.target = self
-        button.action = #selector(handleClick)
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        button.toolTip = "ROG 奥创中心 · 左键打开控制台 / 右键快捷面板"
+        button.toolTip = "ROG 奥创中心 · 点击打开菜单"
         button.setAccessibilityLabel("ROG 奥创中心")
 
-        // 宿主视图铺满按钮，内容在内部居中（避免 menus bar 尚未布局导致 frame 计算出负数而不可见）
+        // 宿主视图铺满按钮，内容在内部居中（避免菜单栏尚未布局导致 frame 计算出负数而不可见）
         let host = PassthroughHostingView(
             rootView: StatusBarView().frame(maxWidth: .infinity, maxHeight: .infinity)
         )
@@ -51,20 +53,57 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         statusItem = item
         hostingView = host
 
-        // 弹出面板
-        let panel = NSHostingController(rootView: MenuPanelView())
-        panel.sizingOptions = [.preferredContentSize]
-        popover.contentViewController = panel
-        popover.behavior = .transient
-        popover.animates = true
-        popover.appearance = NSAppearance(named: .darkAqua)
-        popover.delegate = self
+        // 关键：挂系统菜单（macOS 26 控制中心托管点击后唯一可靠入口）
+        menu.delegate = self
+        rebuildMenuItems()
+        item.menu = menu
 
         // 显示项变化时重新计算状态项宽度
         NotificationCenter.default.addObserver(self,
                                               selector: #selector(defaultsChanged),
                                               name: UserDefaults.didChangeNotification,
                                               object: nil)
+    }
+
+    // MARK: 菜单
+    private func rebuildMenuItems() {
+        menu.removeAllItems()
+
+        let open = NSMenuItem(title: "打开控制台", action: #selector(menuOpenConsole), keyEquivalent: "o")
+        open.target = self
+        menu.addItem(open)
+
+        let login = NSMenuItem(title: "开机自启动", action: #selector(menuToggleLogin), keyEquivalent: "")
+        login.target = self
+        login.state = SMAppServiceCheck.isEnabled ? .on : .off
+        menu.addItem(login)
+
+        menu.addItem(.separator())
+
+        let quit = NSMenuItem(title: "退出 ROG 奥创中心", action: #selector(menuQuit), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
+    }
+
+    // 菜单即将显示时刷新状态
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if let login = menu.items.first(where: { $0.action == #selector(menuToggleLogin) }) {
+            login.state = SMAppServiceCheck.isEnabled ? .on : .off
+        }
+    }
+
+    @objc private func menuOpenConsole() {
+        (NSApp.delegate as? AppDelegate)?.diagLog("menuOpenConsole")
+        AppRouter.showConsole()
+    }
+
+    @objc private func menuToggleLogin() {
+        let target = !SMAppServiceCheck.isEnabled
+        SMAppServiceCheck.setEnabled(target)
+    }
+
+    @objc private func menuQuit() {
+        NSApp.terminate(nil)
     }
 
     @objc private func defaultsChanged() {
@@ -80,33 +119,5 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if abs((statusItem?.length ?? 0) - len) > 0.5 {
             statusItem?.length = len
         }
-    }
-
-    // MARK: 交互
-    //
-    // 左键直接打开控制台窗口（用户的核心诉求），右键弹出快捷面板。
-    // 之前「点击没反应」的根因是 accessory 应用激活失败 —— 现在直接走
-    // showConsole()（内部切 .regular 激活策略），不再依赖 popover 路径。
-    @objc private func handleClick() {
-        let t = NSApp.currentEvent?.type.rawValue ?? 0
-        NSLog("ROG: statusClick type=%d", t)
-        (NSApp.delegate as? AppDelegate)?.diagLog("statusClick event=\(t)")
-        if let e = NSApp.currentEvent, e.type == .rightMouseUp {
-            if popover.isShown { closePopover() } else { showPopover() }
-        } else {
-            closePopover()
-            AppRouter.showConsole()
-        }
-    }
-
-    func showPopover() {
-        guard let button = statusItem?.button else { return }
-        NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
-    }
-
-    func closePopover() {
-        if popover.isShown { popover.performClose(nil) }
     }
 }

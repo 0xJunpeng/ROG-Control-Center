@@ -215,9 +215,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
 
-    func showConsole() {
-        StatusItemController.shared.closePopover()
+    /// 用 CGWindowList 检测窗口是否真的渲染在屏幕上（isVisible 会对「卡在别的 Space」的窗口撒谎）
+    private static func isWindowOnScreen(_ w: NSWindow) -> Bool {
+        let opts = CGWindowListOption(arrayLiteral: .optionOnScreenOnly, .excludeDesktopElements)
+        guard let list = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] else { return true }
+        let pid = ProcessInfo.processInfo.processIdentifier
+        return list.contains { info in
+            guard let wpid = info[kCGWindowOwnerPID as String] as? Int,
+                  let num = info[kCGWindowNumber as String] as? Int else { return false }
+            return wpid == pid && num == w.windowNumber
+        }
+    }
 
+    /// 检测并清理「自称可见但实际不在屏上」的僵尸窗口（卡在其他 Space）
+    private func reapZombieWindow() {
+        if let w = window, w.isVisible, !Self.isWindowOnScreen(w) {
+            diagLog("zombie window detected, recreating (frame=\(w.frame))")
+            w.orderOut(nil)
+            window = nil   // 丢弃重建：新窗口必然创建在当前空间
+        }
+    }
+
+    func showConsole() {
+        reapZombieWindow()
         if window == nil { window = makeWindow() }
         guard let w = window else { return }
 
@@ -240,8 +260,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
 
+        // fullScreenAuxiliary：即使当前 Space 是全屏 App 也允许浮在上面
+        w.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        if NSApp.isHidden { NSApp.unhide(nil) }
         w.level = .floating   // 先置顶确保可见，激活成功后回落
-        w.collectionBehavior.insert(.moveToActiveSpace)
         w.makeKeyAndOrderFront(nil)
         w.orderFrontRegardless()
 
@@ -251,15 +273,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSRunningApplication.current.activate(options: [.activateAllWindows])
             w.makeKeyAndOrderFront(nil)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak w] in
-            guard let w else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self, weak w] in
+            guard let self, let w else { return }
             w.level = .normal
+            let onscreen = Self.isWindowOnScreen(w)
+            if !onscreen {
+                // 自愈兜底：仍卡在别的 Space → 销毁重建，新窗口必然落在当前空间
+                diagLog("self-heal: window still offscreen, recreating")
+                w.orderOut(nil)
+                self.window = nil
+                self.showConsole()
+                return
+            }
             if w.isVisible && !w.isKeyWindow {
                 // 二次激活兜底
                 NSApp.activate(ignoringOtherApps: true)
                 w.makeKeyAndOrderFront(nil)
             }
-            self?.diagLog("showConsole visible=\(w.isVisible) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) policy=\(NSApp.activationPolicy().rawValue) frame=\(w.frame)")
+            self.diagLog("showConsole visible=\(w.isVisible) onscreen=\(onscreen) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) policy=\(NSApp.activationPolicy().rawValue) frame=\(w.frame)")
         }
 
         if CommandLine.arguments.contains("--diag-open") {

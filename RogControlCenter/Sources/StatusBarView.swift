@@ -153,7 +153,6 @@ struct MenuPanelView: View {
 
             // 功能按钮
             Button {
-                StatusItemController.shared.closePopover()
                 AppRouter.showConsole()
             } label: {
                 HStack {
