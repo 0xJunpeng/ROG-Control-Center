@@ -88,6 +88,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     // 之前「点击没反应」的根因是 accessory 应用激活失败 —— 现在直接走
     // showConsole()（内部切 .regular 激活策略），不再依赖 popover 路径。
     @objc private func handleClick() {
+        let t = NSApp.currentEvent?.type.rawValue ?? 0
+        NSLog("ROG: statusClick type=%d", t)
+        (NSApp.delegate as? AppDelegate)?.diagLog("statusClick event=\(t)")
         if let e = NSApp.currentEvent, e.type == .rightMouseUp {
             if popover.isShown { closePopover() } else { showPopover() }
         } else {

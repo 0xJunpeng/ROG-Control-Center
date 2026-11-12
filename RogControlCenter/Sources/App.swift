@@ -177,6 +177,18 @@ enum AppLaunch {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow?
 
+    /// 诊断日志（排查「点了没反应」用）
+    func diagLog(_ line: String) {
+        let text = "\(Date()) \(line)\n"
+        let path = "/tmp/rog-console-diag.log"
+        if let fh = FileHandle(forWritingAtPath: path) {
+            fh.seekToEndOfFile(); fh.write(text.data(using: .utf8)!); fh.closeFile()
+        } else {
+            try? text.write(toFile: path, atomically: true, encoding: .utf8)
+        }
+        NSLog("ROG: %@", line)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory) // 后台常驻，无 Dock 图标
         StatusItemController.shared.install()
@@ -232,10 +244,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         w.collectionBehavior.insert(.moveToActiveSpace)
         w.makeKeyAndOrderFront(nil)
         w.orderFrontRegardless()
+
+        // 激活策略切换后需要短暂的 runloop 周期才能生效，分两次尝试激活
         NSApp.activate(ignoringOtherApps: true)
-        NSRunningApplication.current.activate(options: [.activateAllWindows])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak w] in
-            w?.level = .normal
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NSRunningApplication.current.activate(options: [.activateAllWindows])
+            w.makeKeyAndOrderFront(nil)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak w] in
+            guard let w else { return }
+            w.level = .normal
+            if w.isVisible && !w.isKeyWindow {
+                // 二次激活兜底
+                NSApp.activate(ignoringOtherApps: true)
+                w.makeKeyAndOrderFront(nil)
+            }
+            self?.diagLog("showConsole visible=\(w.isVisible) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) policy=\(NSApp.activationPolicy().rawValue) frame=\(w.frame)")
         }
 
         if CommandLine.arguments.contains("--diag-open") {
