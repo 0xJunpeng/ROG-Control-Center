@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="RogControlCenter"
 APP="build/${APP_NAME}.app"
-VERSION="1.3.0"
+VERSION="1.4.0"
 DMG_NAME="ROG奥创中心-${VERSION}.dmg"
 
 echo "==> 1/5 生成图标"

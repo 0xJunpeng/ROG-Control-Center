@@ -42,6 +42,43 @@ struct PerformancePage: View {
             }
             .frame(maxWidth: .infinity)
 
+            PanelCard(title: "功耗监测", meta: m.powerSourceText) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 14) {
+                        powerTile("CPU 封装",
+                                  m.cpuPowerW > 0 ? String(format: "%.1f W", m.cpuPowerW) : "待重启生效",
+                                  m.cpuPowerW > 45 ? AppTheme.rogRed : AppTheme.orange,
+                                  "bolt.fill")
+                        powerTile("内存 (DRAM)",
+                                  m.dramPowerW > 0 ? String(format: "%.1f W", m.dramPowerW) : "平台不提供",
+                                  AppTheme.blue,
+                                  "memorychip")
+                        powerTile("显卡",
+                                  "驱动不提供",
+                                  .gray,
+                                  "display")
+                        powerTile("电池",
+                                  bText,
+                                  battColor,
+                                  m.battOnAC ? "powerplug.fill" : "battery.75percent")
+                    }
+                    if m.cpuPowerW > 0 {
+                        Text("CPU 功耗曲线").font(.system(size: 10.5)).foregroundColor(.gray)
+                        Sparkline(data: m.histPower, color: AppTheme.orange, range: 0...50)
+                            .frame(height: 70)
+                    }
+                    if m.battValid {
+                        VStack(alignment: .leading, spacing: 6) {
+                            perfInfoRow("电源状态", m.powerStateText)
+                            perfInfoRow("当前功率", m.battDetailText)
+                            perfInfoRow("电量", String(format: "%.0f%%", m.battPercent))
+                            perfInfoRow("循环次数", "\(m.battCycles) 次")
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+            }
+
             PanelCard(title: "性能模式", meta: "记录偏好 · 不改硬件") {
                 HStack(spacing: 12) {
                     ForEach(Array(modes.enumerated()), id: \.offset) { i, item in
@@ -84,6 +121,48 @@ struct PerformancePage: View {
         }
     }
 
+    // MARK: 功耗文案与颜色
+    private var bText: String {
+        if !m.battValid { return "无电池" }
+        if m.battWatts > 0.3 { return String(format: "%.1f W", m.battWatts) }
+        if m.battWatts < -0.3 { return String(format: "-%.1f W", m.battWatts) }
+        return "待机"
+    }
+    private var battColor: Color {
+        if !m.battValid { return .gray }
+        if !m.battOnAC && m.battPercent < 20 { return AppTheme.rogRed }
+        return m.battOnAC ? AppTheme.green : AppTheme.orange
+    }
+
+    // MARK: 功耗小方格
+    private func powerTile(_ name: String, _ value: String, _ color: Color, _ icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 11))
+                Text(name).font(.system(size: 11))
+            }
+            .foregroundColor(.gray)
+            Text(value)
+                .font(.system(size: 16, weight: .heavy, design: .monospaced))
+                .foregroundColor(value == "驱动不提供" || value == "平台不提供" || value == "无电池" ? .gray : color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.045)))
+    }
+
+    private func perfInfoRow(_ k: String, _ v: String) -> some View {
+        HStack(alignment: .top) {
+            Text(k).font(.system(size: 11.5)).foregroundColor(.gray).frame(width: 70, alignment: .leading)
+            Text(v).font(.system(size: 11.5, design: .monospaced))
+                .foregroundColor(.white.opacity(0.85))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private func modeCard(_ idx: Int, icon: String, name: String, desc: String, hint: String) -> some View {
         let active = mode == idx
         return VStack(spacing: 7) {
@@ -114,6 +193,7 @@ struct MenuBarPage: View {
     @AppStorage("mb.showRAM") private var showRAM = true
     @AppStorage("mb.showSSD") private var showSSD = true
     @AppStorage("mb.showNet") private var showNet = true
+    @AppStorage("mb.showPWR") private var showPWR = false
     @State private var launchAtLogin = SMAppServiceCheck.isEnabled
 
     var body: some View {
@@ -133,6 +213,7 @@ struct MenuBarPage: View {
                     toggleRow("内存占用", "memorychip", $showRAM)
                     toggleRow("磁盘占用", "internaldrive", $showSSD)
                     toggleRow("网络上下行", "arrow.up.arrow.down", $showNet)
+                    toggleRow("功耗 PWR", "bolt", $showPWR)
                 }
             }
 
@@ -215,6 +296,8 @@ struct AdvancedPage: View {
                     infoRow("SMC 用户客户端", m.hasSMC ? "可用" : "被系统拒绝")
                     infoRow("温度来源", m.tempSource)
                     infoRow("风扇通道", m.fanRPM.isEmpty ? "不可用（EC）" : "\(m.fanRPM.count) 路")
+                    infoRow("功耗通道", m.cpuPowerW > 0 ? "RAPL（kext 0.5）" : "等待 kext 0.5 重启生效")
+                    infoRow("电池通道", m.battValid ? "AppleSmartBattery" : "未检测到")
                 }
             }
 

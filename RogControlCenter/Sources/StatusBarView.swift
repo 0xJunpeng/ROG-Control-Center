@@ -9,6 +9,7 @@ struct StatusBarView: View {
     @AppStorage("mb.showRAM") private var showRAM = true
     @AppStorage("mb.showSSD") private var showSSD = true
     @AppStorage("mb.showNet") private var showNet = true
+    @AppStorage("mb.showPWR") private var showPWR = false
 
     // 菜单栏在浅色/深色外观下都会正确解析
     private var ink: Color { Color(nsColor: .labelColor) }
@@ -26,10 +27,28 @@ struct StatusBarView: View {
             if showCPU { metric("CPU", m.cpuUsage, tint: cpuTint) }
             if showRAM { metric("RAM", m.ramUsage, tint: AppTheme.blue) }
             if showSSD { metric("SSD", m.diskUsage, tint: AppTheme.cyan) }
+            if showPWR { power }
             if showNet { net }
         }
         .padding(.horizontal, 3)
         .fixedSize()
+    }
+
+    // MARK: 功耗胶囊（CPU 封装功耗）
+    private var power: some View {
+        HStack(spacing: 2) {
+            Text("PWR")
+                .font(.system(size: 7.5, weight: .heavy))
+                .tracking(0.2)
+                .foregroundColor(AppTheme.orange)
+            Text(m.cpuPowerW > 0 ? String(format: "%dW", Int(m.cpuPowerW.rounded())) : "—")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(ink)
+                .frame(width: 26, alignment: .trailing)
+        }
+        .padding(.horizontal, 3)
+        .padding(.vertical, 2.5)
+        .background(SlantRect(slant: 2).fill(pillFill))
     }
 
     // MARK: 单个指标胶囊
@@ -115,6 +134,12 @@ struct MenuPanelView: View {
                 row("上传速度", SystemMonitor.speedText(m.upSpeed), AppTheme.orange)
                 row("下载速度", SystemMonitor.speedText(m.downSpeed), AppTheme.green)
                 row("CPU 温度", m.cpuTemp > 0 ? String(format: "%.0f °C", m.cpuTemp) : "不可用", m.cpuTemp > 80 ? AppTheme.rogRed : AppTheme.green)
+                row("CPU 功耗", m.cpuPowerW > 0 ? String(format: "%.1f W", m.cpuPowerW) : "待重启生效", AppTheme.orange)
+                row("电源", m.powerStateText, m.battOnAC ? AppTheme.green : AppTheme.orange)
+                if m.battValid {
+                    row("电池", m.battDetailText, m.battWatts < -0.3 ? AppTheme.green : (m.battOnAC ? AppTheme.blue : AppTheme.orange))
+                    row("电量", String(format: "%.0f%% · %d 次循环", m.battPercent, m.battCycles), AppTheme.cyan)
+                }
                 if !m.fanRPM.isEmpty {
                     ForEach(Array(m.fanRPM.enumerated()), id: \.offset) { i, rpm in
                         row(i == 0 ? "CPU 风扇" : "风扇 \(i + 1)", String(format: "%.0f RPM", rpm), AppTheme.blue)

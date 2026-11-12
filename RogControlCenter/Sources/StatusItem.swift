@@ -36,8 +36,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         button.image = nil
         button.target = self
         button.action = #selector(handleClick)
-        button.sendAction(on: [.leftMouseUp])
-        button.toolTip = "ROG 奥创中心 · 点击查看详情"
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        button.toolTip = "ROG 奥创中心 · 左键打开控制台 / 右键快捷面板"
         button.setAccessibilityLabel("ROG 奥创中心")
 
         // 宿主视图铺满按钮，内容在内部居中（避免 menus bar 尚未布局导致 frame 计算出负数而不可见）
@@ -83,8 +83,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     // MARK: 交互
+    //
+    // 左键直接打开控制台窗口（用户的核心诉求），右键弹出快捷面板。
+    // 之前「点击没反应」的根因是 accessory 应用激活失败 —— 现在直接走
+    // showConsole()（内部切 .regular 激活策略），不再依赖 popover 路径。
     @objc private func handleClick() {
-        if popover.isShown { closePopover() } else { showPopover() }
+        if let e = NSApp.currentEvent, e.type == .rightMouseUp {
+            if popover.isShown { closePopover() } else { showPopover() }
+        } else {
+            closePopover()
+            AppRouter.showConsole()
+        }
     }
 
     func showPopover() {

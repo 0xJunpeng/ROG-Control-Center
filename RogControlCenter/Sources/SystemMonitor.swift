@@ -12,6 +12,16 @@ final class SystemMonitor: ObservableObject {
     @Published var cpuTemp: Double = 0         // °C (SMC / 内核传感器)
     @Published var tempSource: String = "不可用"  // 温度数据来源
     @Published var fanRPM: [Double] = []       // 各风扇转速 (SMC)
+    @Published var cpuPowerW: Double = 0       // CPU 封装功耗 (RAPL, kext)
+    @Published var dramPowerW: Double = 0      // 内存功耗 (RAPL, kext)
+    @Published var gpuPowerW: Double = 0       // GPU 功耗（macOS 26 无数据源，恒 0）
+    @Published var battWatts: Double = 0       // 电池功率：放电为正 / 充电为负
+    @Published var battPercent: Double = 0     // 电量 %
+    @Published var battCharging: Bool = false
+    @Published var battOnAC: Bool = true
+    @Published var battCycles: Int = 0
+    @Published var battValid: Bool = false
+    @Published var histPower: [Double] = Array(repeating: 8, count: 60)
     @Published var histCPU: [Double] = Array(repeating: 5, count: 60)
     @Published var histTemp: [Double] = Array(repeating: 45, count: 60)
 
@@ -53,8 +63,10 @@ final class SystemMonitor: ObservableObject {
         sampleDisk()
         sampleNet()
         sampleSMC()
+        samplePower()
         histCPU.append(cpuUsage);  if histCPU.count  > 60 { histCPU.removeFirst(histCPU.count - 60) }
         histTemp.append(cpuTemp);  if histTemp.count > 60 { histTemp.removeFirst(histTemp.count - 60) }
+        histPower.append(max(0, cpuPowerW)); if histPower.count > 60 { histPower.removeFirst(histPower.count - 60) }
     }
 
     // MARK: - CPU（host_processor_info）
@@ -194,6 +206,44 @@ final class SystemMonitor: ObservableObject {
         cpuTemp = smcTemp > 0 ? smcTemp : KextSensors.cpuTemperature()
         fanRPM = smc.readFanSpeeds()
         tempSource = smcTemp > 0 ? "SMC" : (cpuTemp > 0 ? "内核传感器" : "不可用")
+    }
+
+    // MARK: - 功耗（kext RAPL + 电池）
+    private func samplePower() {
+        cpuPowerW = KextSensors.cpuPower()
+        dramPowerW = KextSensors.dramPower()
+
+        let b = PowerMonitor.readBattery()
+        battWatts = b.watts
+        battPercent = b.percent
+        battCharging = b.charging
+        battOnAC = b.onAC
+        battCycles = b.cycleCount
+        battValid = b.valid
+    }
+
+    /// 功耗数据来源说明
+    var powerSourceText: String {
+        if cpuPowerW > 0 { return "kext RAPL + 电池" }
+        if battValid { return "电池（CPU 功耗需重启生效）" }
+        return "不可用"
+    }
+
+    /// 电源状态文案
+    var powerStateText: String {
+        if !battValid { return "未检测到电池" }
+        if battOnAC && battPercent >= 99.5 { return "外接电源 · 已充满" }
+        if battOnAC && battCharging { return "外接电源 · 充电中" }
+        if battOnAC { return "外接电源" }
+        return "使用电池"
+    }
+
+    /// 电池功率详情（放电为正，充电为负）
+    var battDetailText: String {
+        guard battValid else { return "—" }
+        if battWatts > 0.3 { return String(format: "放电 %.1f W", battWatts) }
+        if battWatts < -0.3 { return String(format: "充电 %.1f W", -battWatts) }
+        return "0 W（待机）"
     }
 
     // MARK: - 格式化辅助

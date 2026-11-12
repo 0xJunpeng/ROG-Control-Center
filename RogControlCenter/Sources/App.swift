@@ -11,7 +11,7 @@ struct ROGControlCenterApp: App {
         if CommandLine.arguments.contains("--smc-test") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                 let m = SystemMonitor.shared
-                print("RESULT cpu=\(String(format: "%.1f", m.cpuUsage)) ram=\(String(format: "%.1f", m.ramUsage)) disk=\(String(format: "%.1f", m.diskUsage)) temp=\(String(format: "%.1f", m.cpuTemp)) fans=\(m.fanRPM.map { String(format: "%.0f", $0) }.joined(separator: ",")) up=\(String(format: "%.0f", m.upSpeed)) down=\(String(format: "%.0f", m.downSpeed)) smc=\(m.hasSMC)")
+                print("RESULT cpu=\(String(format: "%.1f", m.cpuUsage)) ram=\(String(format: "%.1f", m.ramUsage)) disk=\(String(format: "%.1f", m.diskUsage)) temp=\(String(format: "%.1f", m.cpuTemp)) fans=\(m.fanRPM.map { String(format: "%.0f", $0) }.joined(separator: ",")) up=\(String(format: "%.0f", m.upSpeed)) down=\(String(format: "%.0f", m.downSpeed)) smc=\(m.hasSMC) cpupower=\(String(format: "%.1f", m.cpuPowerW)) drampower=\(String(format: "%.1f", m.dramPowerW)) batt=\(String(format: "%.1f", m.battWatts))W batt%%=\(String(format: "%.0f", m.battPercent)) ac=\(m.battOnAC)")
                 exit(0)
             }
         }
@@ -143,7 +143,10 @@ enum AppSnapshot {
 
     /// 离屏渲染主窗口内容（--page N --shot path）
     static func shotWindow(to path: String) {
-        guard let w = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
+        // 排除状态栏小窗（NSStatusBarWindow 只有几十 pt 宽），取最大的可见窗口
+        guard let w = NSApp.windows
+            .filter({ $0.isVisible && $0.contentView != nil && $0.frame.width > 400 })
+            .max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }),
               let view = w.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
             print("SHOT fail")
@@ -171,7 +174,7 @@ enum AppLaunch {
 }
 
 // MARK: - AppDelegate
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -206,6 +209,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if window == nil { window = makeWindow() }
         guard let w = window else { return }
 
+        // 关键修复：accessory 应用即使 makeKeyAndOrderFront + activate 也很容易被
+        // 判定为「不可激活」而留在其他 App 后面（表现为点了没反应）。
+        // 控制台打开期间切回 .regular（获得正常激活能力），关窗时再切回 .accessory。
+        NSApp.setActivationPolicy(.regular)
+
         // 历史 frame 可能落在已断开的显示器上，或超出当前屏幕边界 → 居中/钳制
         if let screen = NSScreen.main ?? NSScreen.screens.first {
             let v = screen.visibleFrame
@@ -220,12 +228,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // 无 Dock 图标的 App 必须显式激活，否则窗口会留在其他 App 后面（表现为「点了没反应」）
+        w.level = .floating   // 先置顶确保可见，激活成功后回落
         w.collectionBehavior.insert(.moveToActiveSpace)
         w.makeKeyAndOrderFront(nil)
         w.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         NSRunningApplication.current.activate(options: [.activateAllWindows])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak w] in
+            w?.level = .normal
+        }
 
         if CommandLine.arguments.contains("--diag-open") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -257,9 +268,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.setContentSize(NSSize(width: 1180, height: 760))
 
         w.isReleasedWhenClosed = false
+        w.delegate = self
         w.setFrameAutosaveName("ROGMainConsoleWindow")
         if !w.setFrameUsingName("ROGMainConsoleWindow") { w.center() }
         return w
+    }
+
+    /// 关闭控制台窗口后回到后台模式（撤掉 Dock 图标）
+    func windowWillClose(_ notification: Notification) {
+        guard notification.object as? NSWindow === window else { return }
+        NSApp.setActivationPolicy(.accessory)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
