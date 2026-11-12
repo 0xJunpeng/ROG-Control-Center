@@ -19,7 +19,10 @@ clang++ -fapple-kext -fno-exceptions -fno-rtti -fno-implicit-templates -mkernel 
   -c NvFanProbe/NvFanProbe.cpp -o build/NvFanProbe.o
 
 echo "==> 链接为 kext bundle"
+# 入口函数由源码自己提供（NvFanProbeKernStart/Stop），
+# 不能链 libkmod.a —— 其 _start 依赖内核私有符号 __realmain，链接期会失败
 ld -r -arch x86_64 -o "$OUT/Contents/MacOS/NvFanProbe" build/NvFanProbe.o -kext
+nm -arch x86_64 "$OUT/Contents/MacOS/NvFanProbe" | grep -E "KernStart|_kmod_info"
 
 echo "==> 写入 Info.plist"
 cp NvFanProbe/Info.plist "$OUT/Contents/Info.plist"

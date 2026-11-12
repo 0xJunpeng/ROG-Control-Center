@@ -129,8 +129,25 @@ void NvFanProbe::free()
 
 // 现代 ld 不再自动生成 kext 的 kmod_info 符号，需显式声明，
 // 否则 kmutil 会报 "kexts must have a _kmod_info symbol"。
+//
+// 注意：第 3/4 个参数不能为 0 —— 内核靠 kmod 的 start 回调进入 kext 的
+// 模块初始化流程，传 0 会导致 OSMetaClass 不注册，表现是 kext 加载成功、
+// 但 IOService 实例永远为 0、personality 永不匹配。
+// 也不能直接链 libkmod.a（它的 _start 依赖内核私有符号 __realmain，
+// 第三方 kext 在链接期会报 "could not find a kext which exports this symbol"）。
 extern "C" {
 #include <mach/kmod.h>
+
+static kern_return_t NvFanProbeKernStart(kmod_info_t *ki, void *data)
+{
+    return KERN_SUCCESS;
 }
-KMOD_EXPLICIT_DECL(com.yangjp.NvFanProbe, "0.3", 0, 0)
+
+static kern_return_t NvFanProbeKernStop(kmod_info_t *ki, void *data)
+{
+    return KERN_SUCCESS;
+}
+}
+
+KMOD_EXPLICIT_DECL(com.yangjp.NvFanProbe, "0.4", NvFanProbeKernStart, NvFanProbeKernStop)
 

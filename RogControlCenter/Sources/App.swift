@@ -167,7 +167,7 @@ enum AppLaunch {
         if let i = args.firstIndex(of: "--page"), args.count > i + 1, let n = Int(args[i + 1]) { return n }
         return 0
     }
-    static var windowOnly: Bool { args.contains("--page") }
+    static var windowOnly: Bool { args.contains("--page") || args.contains("--diag-open") }
 }
 
 // MARK: - AppDelegate
@@ -176,14 +176,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory) // 后台常驻，无 Dock 图标
-        if !AppLaunch.windowOnly { StatusItemController.shared.install() }
-        showConsole()
+        StatusItemController.shared.install()
+
+        // 开机自启 / 登录项启动时只留菜单栏，不弹窗口；仅测试模式（--page）才开窗
+        if AppLaunch.windowOnly { showConsole() }
+
+        // 后台模式自检：确认启动后没有可见窗口
+        if CommandLine.arguments.contains("--diag-bg") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                let lines = NSApp.windows.map { w in
+                    "win title='\(w.title)' class=\(type(of: w)) visible=\(w.isVisible) frame=\(w.frame)"
+                }
+                let line = "BG windows=\(NSApp.windows.count) policy=\(NSApp.activationPolicy().rawValue)\n" + lines.joined(separator: "\n")
+                try? line.write(toFile: "/tmp/rog-diag-bg.txt", atomically: true, encoding: .utf8)
+                exit(0)
+            }
+        }
+    }
+
+    /// 已在后台运行时，双击 App 图标 / 从访达重新打开 → 唤出控制台
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { showConsole() }
+        return true
     }
 
     func showConsole() {
+        StatusItemController.shared.closePopover()
+
         if window == nil { window = makeWindow() }
+        guard let w = window else { return }
+
+        // 历史 frame 可能落在已断开的显示器上，或超出当前屏幕边界 → 居中/钳制
+        if let screen = NSScreen.main ?? NSScreen.screens.first {
+            let v = screen.visibleFrame
+            let c = NSPoint(x: w.frame.midX, y: w.frame.midY)
+            if !v.contains(c) || w.frame.width > v.width || w.frame.height > v.height {
+                w.center()
+            } else {
+                var f = w.frame
+                f.origin.x = min(max(f.minX, v.minX), v.maxX - f.width)
+                f.origin.y = min(max(f.minY, v.minY), v.maxY - f.height)
+                if f != w.frame { w.setFrame(f, display: true) }
+            }
+        }
+
+        // 无 Dock 图标的 App 必须显式激活，否则窗口会留在其他 App 后面（表现为「点了没反应」）
+        w.collectionBehavior.insert(.moveToActiveSpace)
+        w.makeKeyAndOrderFront(nil)
+        w.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        NSRunningApplication.current.activate(options: [.activateAllWindows])
+
+        if CommandLine.arguments.contains("--diag-open") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                let line = "DIAG visible=\(w.isVisible) key=\(w.isKeyWindow) appActive=\(NSApp.isActive) frame=\(w.frame) screens=\(NSScreen.screens.count) policy=\(NSApp.activationPolicy().rawValue)"
+                try? line.write(toFile: "/tmp/rog-diag.txt", atomically: true, encoding: .utf8)
+                print(line)
+            }
+        }
     }
 
     private func makeWindow() -> NSWindow {

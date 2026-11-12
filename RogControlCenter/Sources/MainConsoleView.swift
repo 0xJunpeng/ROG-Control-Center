@@ -396,7 +396,7 @@ struct MainConsoleView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("ROG 奥创中心 · for macOS")
                     .font(.system(size: 17, weight: .bold)).foregroundColor(.white)
-                Text("版本 1.2.0 · 原生 SwiftUI 构建 · DMG 安装")
+                Text("版本 1.3.0 · 原生 SwiftUI 构建 · DMG 安装")
                     .font(.system(size: 12)).foregroundColor(.gray)
                 Text("数据来源：CPU/内存 host_statistics、磁盘 statfs、网络 sysctl(NET_RT_IFLIST2)、温度与风扇 SMC。所有读取均为只读操作，不修改硬件状态。")
                     .font(.system(size: 12)).foregroundColor(.gray)
